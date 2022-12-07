@@ -7,7 +7,7 @@ class TagsController < ApplicationController
   PAGE_SIZE     = 20
   PAGE_SIZE_MAX = 200
 
-  before_action :require_account_signature!, if: -> { request.format == :json && authorized_fetch_mode? }
+  before_action :require_account_signature!, if: -> { (request.format == :json || request.format == :rss) && authorized_fetch_mode? }
   before_action :authenticate_user!, if: :whitelist_mode?
   before_action :set_local
   before_action :set_tag
@@ -23,7 +23,7 @@ class TagsController < ApplicationController
       end
 
       format.rss do
-        expires_in 0, public: true
+        expires_in 0, public: public_fetch_mode?
       end
 
       format.json do

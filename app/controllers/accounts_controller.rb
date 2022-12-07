@@ -7,7 +7,7 @@ class AccountsController < ApplicationController
   include AccountControllerConcern
   include SignatureAuthentication
 
-  before_action :require_account_signature!, if: -> { request.format == :json && authorized_fetch_mode? }
+  before_action :require_account_signature!, if: -> { (request.format == :json || request.format == :rss) && authorized_fetch_mode? }
   before_action :set_cache_headers
 
   skip_around_action :set_locale, if: -> { [:json, :rss].include?(request.format&.to_sym) }
@@ -22,7 +22,7 @@ class AccountsController < ApplicationController
       end
 
       format.rss do
-        expires_in 1.minute, public: true
+        expires_in 1.minute, public: public_fetch_mode?
 
         limit     = params[:limit].present? ? [params[:limit].to_i, PAGE_SIZE_MAX].min : PAGE_SIZE
         @statuses = filtered_statuses.without_reblogs.limit(limit)
