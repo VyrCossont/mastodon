@@ -9,4 +9,6 @@ Rails.application.configure do
   else
     :classic
   end
+
+  config.x.pg_full_text_search_enabled = ENV['PG_FULL_TEXT_SEARCH_ENABLED'] == 'true'
 end

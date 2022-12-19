@@ -34,7 +34,47 @@ class SearchService < BaseService
     )
   end
 
-  def perform_statuses_search!
+  ##
+  # Note: PG full-text search has some limitations in the current iteration:
+  #   - Search with any scope does not include the text of media attachments or polls.
+  #   - Search with :classic scope only searches the current user's own statuses, but not favs, boosts, bookmarks, etc.
+  def perform_pg_statuses_search!
+    definition = Status
+                 .where(deleted_at: nil)
+                 .where(reblog_of_id: nil)
+
+    definition = case Rails.configuration.x.search_scope
+                 when :public
+                   definition.where(visibility: :public)
+                 when :public_or_unlisted
+                   definition.where(visibility: [:public, :unlisted])
+                 else
+                   definition.where(account_id: @account.id)
+                 end
+
+    definition = definition
+                 .where(
+                   "websearch_to_tsquery('english', :query_text) @@ " \
+                     "(to_tsvector('english', spoiler_text) || to_tsvector('english', text))",
+                   { query_text: @query }
+                 )
+
+    if @options[:account_id].present?
+      definition = definition.where({ account_id: @options[:account_id] })
+    end
+
+    if @options[:min_id].present?
+      definition = definition.where('id > :id', { id: @options[:min_id].to_i })
+    end
+
+    if @options[:max_id].present?
+      definition = definition.where('id < :id', { id: @options[:max_id].to_i })
+    end
+
+    definition.limit(@limit).offset(@offset).compact
+  end
+
+  def perform_es_statuses_search!
     statuses_index = StatusesIndex.filter(term: { searchable_by: @account.id })
     case Rails.configuration.x.search_scope
     when :public
@@ -55,14 +95,27 @@ class SearchService < BaseService
       definition = definition.filter(range: { id: range })
     end
 
-    results             = definition.limit(@limit).offset(@offset).objects.compact
+    definition.limit(@limit).offset(@offset).objects.compact
+
+  rescue Faraday::ConnectionFailed, Parslet::ParseFailed
+    []
+  end
+
+  def perform_statuses_search!
+    results =
+      if Rails.configuration.x.pg_full_text_search_enabled
+        perform_pg_statuses_search!
+      elsif Chewy.enabled?
+        perform_es_statuses_search!
+      else
+        return []
+      end
+
     account_ids         = results.map(&:account_id)
     account_domains     = results.map(&:account_domain)
     preloaded_relations = relations_map_for_account(@account, account_ids, account_domains)
 
     results.reject { |status| StatusFilter.new(status, @account, preloaded_relations).filtered? }
-  rescue Faraday::ConnectionFailed, Parslet::ParseFailed
-    []
   end
 
   def perform_hashtags_search!
@@ -95,8 +148,6 @@ class SearchService < BaseService
   end
 
   def full_text_searchable?
-    return false unless Chewy.enabled?
-
     statuses_search? && !@account.nil? && !((@query.start_with?('#') || @query.include?('@')) && !@query.include?(' '))
   end
 
