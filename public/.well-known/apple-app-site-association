@@ -1,0 +1,20 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appID": "9JTH7AWHE6.com.tapbots.Ivory",
+        "appIDs": [
+          "9JTH7AWHE6.com.tapbots.Ivory"
+        ],
+        "components": [
+          {
+            "/": "/@*"
+          }
+        ]
+      }
+    ]
+  },
+   "webcredentials": {
+      "apps": [ "9JTH7AWHE6.com.tapbots.Ivory" ]
+   }
+}
