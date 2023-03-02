@@ -546,6 +546,16 @@ class Account < ApplicationRecord
     save!
   end
 
+  def searchable_text
+    [
+      PlainTextFormatter.new(note, local?).to_s,
+      fields.map { |field| [
+        field.name,
+        PlainTextFormatter.new(field.value, local?).to_s
+      ].join(" ") }
+    ].join("\n\n")
+  end
+
   private
 
   def prepare_contents

@@ -9,4 +9,13 @@ Rails.application.configure do
   else
     :classic
   end
+
+  config.x.account_search_scope = case
+  when ENV['ACCOUNT_SEARCH_SCOPE'] == 'all'
+    :all
+  when ENV['ACCOUNT_SEARCH_SCOPE'] == 'discoverable'
+    :discoverable
+  else
+    :classic
+  end
 end

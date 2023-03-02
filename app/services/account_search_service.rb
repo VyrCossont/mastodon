@@ -73,9 +73,25 @@ class AccountSearchService < BaseService
     Account.search_for(terms_for_query, limit: limit_for_non_exact_results, offset: offset)
   end
 
+  def full_text_enabled
+    !account.nil? && Rails.configuration.x.account_search_scope != :classic
+  end
+
+  def search_fields
+    fields = %w(acct.edge_ngram acct)
+    unless likely_acct?
+      fields += %w(display_name.edge_ngram display_name)
+    end
+    if full_text_enabled
+      fields += %w(text.stemmed text)
+    end
+    fields
+  end
+
   def from_elasticsearch
-    must_clauses   = [{ multi_match: { query: terms_for_query, fields: likely_acct? ? %w(acct.edge_ngram acct) : %w(acct.edge_ngram acct display_name.edge_ngram display_name), type: 'most_fields', operator: 'and' } }]
+    must_clauses   = [{ multi_match: { query: terms_for_query, fields: search_fields, type: 'most_fields', operator: 'and' } }]
     should_clauses = []
+    filter_clauses = []
 
     if account
       return [] if options[:following] && following_ids.empty?
@@ -87,7 +103,12 @@ class AccountSearchService < BaseService
       end
     end
 
-    query     = { bool: { must: must_clauses, should: should_clauses } }
+    if full_text_enabled && Rails.configuration.x.account_search_scope == :discoverable
+      filter_clauses << { term: { discoverable: true } }
+      filter_clauses << { term: { silenced: false } }
+    end
+
+    query     = { bool: { must: must_clauses, should: should_clauses, filter: filter_clauses } }
     functions = [reputation_score_function, followers_score_function, time_distance_function]
 
     records = AccountsIndex.query(function_score: { query: query, functions: functions, boost_mode: 'multiply', score_mode: 'avg' })
