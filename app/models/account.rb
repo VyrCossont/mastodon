@@ -556,6 +556,18 @@ class Account < ApplicationRecord
     ].join("\n\n")
   end
 
+  def searchable_tags
+    Extractor.extract_hashtags(PlainTextFormatter.new(note, local?).to_s)
+  end
+
+  def searchable_is
+    keywords = []
+    keywords << :bot if bot?
+    keywords << :group if group?
+    keywords << :local if local?
+    keywords
+  end
+
   private
 
   def prepare_contents

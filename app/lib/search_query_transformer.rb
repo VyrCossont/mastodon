@@ -5,7 +5,7 @@ class SearchQueryTransformer < Parslet::Transform
     attr_reader :should_clauses, :must_not_clauses, :must_clauses, :filter_clauses, :order_clauses
 
     def initialize(clauses)
-      grouped = clauses.chunk(&:operator).to_h
+      grouped = clauses.group_by(&:operator).to_h
       @should_clauses = grouped.fetch(:should, [])
       @must_not_clauses = grouped.fetch(:must_not, [])
       @must_clauses = grouped.fetch(:must, [])
@@ -170,7 +170,7 @@ class SearchQueryTransformer < Parslet::Transform
     elsif clause[:term]
       TermClause.new(prefix, operator, clause[:term].to_s)
     elsif clause[:shortcode]
-      TermClause.new(prefix, operator, ":#{clause[:term]}:")
+      TermClause.new(prefix, operator, ":#{clause[:shortcode][:term]}:")
     elsif clause[:phrase]
       PhraseClause.new(prefix, operator, clause[:phrase].is_a?(Array) ? clause[:phrase].map { |p| p[:term].to_s }.join(' ') : clause[:phrase].to_s)
     else

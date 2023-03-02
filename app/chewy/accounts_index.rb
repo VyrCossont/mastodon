@@ -46,6 +46,17 @@ class AccountsIndex < Chewy::Index
         type: 'edge_ngram',
         min_gram: 1,
         max_gram: 15,
+      }
+    },
+
+    normalizer: {
+      tag: {
+        type: 'custom',
+        filter: %w(
+          lowercase
+          asciifolding
+          cjk_width
+        ),
       },
     },
   }
@@ -65,10 +76,14 @@ class AccountsIndex < Chewy::Index
 
     field :following_count, type: 'long', value: ->(account) { account.following_count }
     field :followers_count, type: 'long', value: ->(account) { account.followers_count }
+    field :created_at, type: 'date'
     field :last_status_at, type: 'date', value: ->(account) { account.last_status_at || account.created_at }
 
     field :discoverable, type: 'boolean'
     field :silenced, type: 'boolean', value: ->(account) { account.silenced? }
+    field :domain, type: 'keyword', value: ->(account) { account.domain or Rails.configuration.x.local_domain }
+    field :is, type: 'keyword', value: ->(account) { account.searchable_is }
+    field :tags, type: 'keyword', normalizer: 'tag', value: ->(account) { account.searchable_tags }
 
     field :text, type: 'text', value: ->(account) { account.searchable_text } do
       field :stemmed, type: 'text', analyzer: 'text'
