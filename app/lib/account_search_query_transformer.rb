@@ -16,12 +16,8 @@ class AccountSearchQueryTransformer < Parslet::Transform
       full_text_enabled = account_exists && search_scope != :classic
 
       search_fields = %w(acct.edge_ngram acct)
-      unless likely_acct
-        search_fields += %w(display_name.edge_ngram display_name)
-      end
-      if full_text_enabled
-        search_fields += %w(text.stemmed text)
-      end
+      search_fields += %w(display_name.edge_ngram display_name) unless likely_acct
+      search_fields += %w(text.stemmed text) if full_text_enabled
 
       params = {
         must: must_clauses.map { |clause| clause_to_query(clause, search_fields) },
@@ -34,7 +30,7 @@ class AccountSearchQueryTransformer < Parslet::Transform
         if following
           params[:must] << { terms: { id: following_ids } }
         elsif following_ids.any?
-          params[:should] << { terms: { id: following_ids, boost: 100 } }
+          params[:should] << { terms: { id: following_ids, boost: 0.5 } }
         end
       end
 
