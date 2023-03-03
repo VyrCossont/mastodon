@@ -18,6 +18,7 @@ class StatusesIndex < Chewy::Index
         language: 'possessive_english',
       },
     },
+
     analyzer: {
       content: {
         tokenizer: 'uax_url_email',
@@ -28,6 +29,17 @@ class StatusesIndex < Chewy::Index
           cjk_width
           english_stop
           english_stemmer
+        ),
+      },
+    },
+
+    normalizer: {
+      tag: {
+        type: 'custom',
+        filter: %w(
+          lowercase
+          asciifolding
+          cjk_width
         ),
       },
     },
@@ -71,6 +83,7 @@ class StatusesIndex < Chewy::Index
     field :lang, type: 'keyword', value: ->(status) { status.language }
     field :is, type: 'keyword', value: ->(status) { status.searchable_is }
     field :has, type: 'keyword', value: ->(status) { status.searchable_has }
+    field :tags, type: 'keyword', normalizer: 'tag', value: ->(status) { status.searchable_tags }
 
     field :text, type: 'text', value: ->(status) { status.searchable_text } do
       field :stemmed, type: 'text', analyzer: 'content'
