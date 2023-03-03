@@ -38,7 +38,7 @@ class SearchQueryTransformer < Parslet::Transform
       when PrefixClause
         { term: { clause.filter => clause.term } }
       else
-        raise "Unexpected clause type: #{clause}"
+        raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
       end
     end
 
@@ -47,7 +47,7 @@ class SearchQueryTransformer < Parslet::Transform
       when PrefixClause
         { clause.query => { clause.filter => clause.term == :account_id_placeholder ? account.id : clause.term } }
       else
-        raise "Unexpected clause type: #{clause}"
+        raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
       end
     end
 
@@ -56,7 +56,7 @@ class SearchQueryTransformer < Parslet::Transform
       when PrefixClause
         { clause.term => clause.order }
       else
-        raise "Unexpected clause type: #{clause}"
+        raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
       end
     end
   end
@@ -72,7 +72,7 @@ class SearchQueryTransformer < Parslet::Transform
         when nil
           :should
         else
-          raise "Unknown operator: #{str}"
+          raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
         end
       end
     end
@@ -110,7 +110,7 @@ class SearchQueryTransformer < Parslet::Transform
       when '-'
         @operator = :must_not
       else
-        raise "Unknown operator: #{str}"
+        raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
       end
 
       case prefix
@@ -174,7 +174,7 @@ class SearchQueryTransformer < Parslet::Transform
     elsif clause[:phrase]
       PhraseClause.new(prefix, operator, clause[:phrase].is_a?(Array) ? clause[:phrase].map { |p| p[:term].to_s }.join(' ') : clause[:phrase].to_s)
     else
-      raise "Unexpected clause type: #{clause}"
+      raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
     end
   end
 

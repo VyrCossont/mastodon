@@ -55,7 +55,7 @@ class AccountSearchQueryTransformer < Parslet::Transform
       when TagClause
         { term: { tags: clause.tag } }
       else
-        raise "Unexpected clause type: #{clause}"
+        raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
       end
     end
   end
@@ -71,7 +71,7 @@ class AccountSearchQueryTransformer < Parslet::Transform
         when nil
           :should
         else
-          raise "Unknown operator: #{str}"
+          raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
         end
       end
     end
@@ -109,7 +109,7 @@ class AccountSearchQueryTransformer < Parslet::Transform
       when '-'
         @operator = :must_not
       else
-        raise "Unknown operator: #{str}"
+        raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
       end
 
       case prefix
@@ -135,7 +135,7 @@ class AccountSearchQueryTransformer < Parslet::Transform
       when '-'
         @operator = :must_not
       else
-        raise "Unknown operator: #{str}"
+        raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
       end
     end
   end
@@ -155,7 +155,7 @@ class AccountSearchQueryTransformer < Parslet::Transform
     elsif clause[:phrase]
       PhraseClause.new(prefix, operator, clause[:phrase].is_a?(Array) ? clause[:phrase].map { |p| p[:term].to_s }.join(' ') : clause[:phrase].to_s)
     else
-      raise "Unexpected clause type: #{clause}"
+      raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
     end
   end
 
