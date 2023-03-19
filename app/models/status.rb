@@ -113,6 +113,7 @@ class Status < ApplicationRecord
 
   after_create_commit :trigger_create_webhooks
   after_update_commit :trigger_update_webhooks
+  after_destroy_commit :trigger_delete_webhooks
 
   cache_associated :application,
                    :media_attachments,
@@ -545,5 +546,9 @@ class Status < ApplicationRecord
 
   def trigger_update_webhooks
     TriggerWebhookWorker.perform_async('status.updated', 'Status', id) if local?
+  end
+
+  def trigger_delete_webhooks
+    TriggerWebhookWorker.perform_async('status.deleted', 'Status', id) if local?
   end
 end

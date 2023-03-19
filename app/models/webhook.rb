@@ -19,7 +19,9 @@ class Webhook < ApplicationRecord
     account.created
     account.updated
     report.created
+    report.updated
     status.created
+    status.deleted
     status.updated
   ).freeze
 
