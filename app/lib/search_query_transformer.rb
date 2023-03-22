@@ -37,8 +37,10 @@ class SearchQueryTransformer < Parslet::Transform
         { match_phrase: { text: { query: clause.phrase } } }
       when PrefixClause
         { term: { clause.filter => clause.term } }
+      when TagClause
+        { term: { tags: clause.tag } }
       else
-        raise "Unexpected clause type: #{clause}"
+        raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
       end
     end
 
@@ -46,8 +48,10 @@ class SearchQueryTransformer < Parslet::Transform
       case clause
       when PrefixClause
         { clause.query => { clause.filter => clause.term == :account_id_placeholder ? account.id : clause.term } }
+      when TagClause
+        { term: { tags: clause.tag } }
       else
-        raise "Unexpected clause type: #{clause}"
+        raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
       end
     end
 
@@ -56,7 +60,7 @@ class SearchQueryTransformer < Parslet::Transform
       when PrefixClause
         { clause.term => clause.order }
       else
-        raise "Unexpected clause type: #{clause}"
+        raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
       end
     end
   end
@@ -72,7 +76,7 @@ class SearchQueryTransformer < Parslet::Transform
         when nil
           :should
         else
-          raise "Unknown operator: #{str}"
+          raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
         end
       end
     end
@@ -98,6 +102,24 @@ class SearchQueryTransformer < Parslet::Transform
     end
   end
 
+  class TagClause
+    attr_reader :prefix, :operator, :tag
+
+    def initialize(prefix, operator, tag)
+      @prefix = prefix
+      @tag = tag
+
+      case operator
+      when '+', nil
+        @operator = :filter
+      when '-'
+        @operator = :must_not
+      else
+        raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
+      end
+    end
+  end
+
   class PrefixClause
     attr_reader :filter, :operator, :term, :order, :query
 
@@ -110,7 +132,7 @@ class SearchQueryTransformer < Parslet::Transform
       when '-'
         @operator = :must_not
       else
-        raise "Unknown operator: #{str}"
+        raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
       end
 
       case prefix
@@ -171,10 +193,12 @@ class SearchQueryTransformer < Parslet::Transform
       TermClause.new(prefix, operator, clause[:term].to_s)
     elsif clause[:shortcode]
       TermClause.new(prefix, operator, ":#{clause[:shortcode][:term]}:")
+    elsif clause[:hashtag]
+      TagClause.new(prefix, operator, clause[:hashtag][:term].to_s)
     elsif clause[:phrase]
       PhraseClause.new(prefix, operator, clause[:phrase].is_a?(Array) ? clause[:phrase].map { |p| p[:term].to_s }.join(' ') : clause[:phrase].to_s)
     else
-      raise "Unexpected clause type: #{clause}"
+      raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
     end
   end
 

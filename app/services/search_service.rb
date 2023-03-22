@@ -15,9 +15,39 @@ class SearchService < BaseService
       if url_query?
         results.merge!(url_resource_results) unless url_resource.nil? || @offset.positive? || (@options[:type].present? && url_resource_symbol != @options[:type].to_sym)
       elsif @query.present?
-        results[:accounts] = perform_accounts_search! if account_searchable?
-        results[:statuses] = perform_statuses_search! if full_text_searchable?
-        results[:hashtags] = perform_hashtags_search! if hashtag_searchable?
+        # Account and status searches use different sets of prefix operators.
+        # Throw a syntax error only if the syntax is invalid in all search contexts.
+        search_succeeded = false
+        syntax_error = nil
+
+        if account_searchable?
+          begin
+            results[:accounts] = perform_accounts_search!
+            search_succeeded = true
+          rescue Mastodon::SyntaxError => e
+            syntax_error = e
+          end
+        end
+
+        if full_text_searchable?
+          begin
+            results[:statuses] = perform_statuses_search!
+            search_succeeded = true
+          rescue Mastodon::SyntaxError => e
+            syntax_error = e
+          end
+        end
+
+        if hashtag_searchable?
+          begin
+            results[:hashtags] = perform_hashtags_search!
+            search_succeeded = true
+          rescue Mastodon::SyntaxError => e
+            syntax_error = e
+          end
+        end
+
+        raise syntax_error unless syntax_error.nil? || search_succeeded
       end
     end
   end

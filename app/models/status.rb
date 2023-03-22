@@ -168,6 +168,10 @@ class Status < ApplicationRecord
     ].compact.join("\n\n")
   end
 
+  def searchable_tags
+    Extractor.extract_hashtags(FormattingHelper.extract_status_plain_text(self))
+  end
+
   def searchable_is
     keywords = []
     keywords << :bot if account.bot?

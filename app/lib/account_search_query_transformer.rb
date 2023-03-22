@@ -20,15 +20,15 @@ class AccountSearchQueryTransformer < Parslet::Transform
       search_fields += %w(text.stemmed text) if full_text_enabled
 
       params = {
-        must: must_clauses.map { |clause| clause_to_query(clause, search_fields) },
-        must_not: must_not_clauses.map { |clause| clause_to_query(clause, search_fields) },
-        should: should_clauses.map { |clause| clause_to_query(clause, search_fields) },
-        filter: filter_clauses.map { |clause| clause_to_query(clause, search_fields) },
+        must: must_clauses.map { |clause| clause_to_query(clause, search_fields, following_ids) },
+        must_not: must_not_clauses.map { |clause| clause_to_query(clause, search_fields, following_ids) },
+        should: should_clauses.map { |clause| clause_to_query(clause, search_fields, following_ids) },
+        filter: filter_clauses.map { |clause| clause_to_query(clause, search_fields, following_ids) },
       }
 
       if account_exists
         if following
-          params[:must] << { terms: { id: following_ids } }
+          params[:filter] << { terms: { id: following_ids } }
         elsif following_ids.any?
           params[:should] << { terms: { id: following_ids, boost: 0.5 } }
         end
@@ -44,18 +44,18 @@ class AccountSearchQueryTransformer < Parslet::Transform
 
     private
 
-    def clause_to_query(clause, search_fields)
+    def clause_to_query(clause, search_fields, following_ids)
       case clause
       when TermClause
         { multi_match: { type: 'most_fields', query: clause.term, fields: search_fields, operator: 'and' } }
       when PhraseClause
         { match_phrase: { text: { query: clause.phrase } } }
       when PrefixClause
-        { clause.query => { clause.filter => clause.term } }
+        { clause.query => { clause.filter => clause.term == :following_ids_placeholder ? following_ids : clause.term } }
       when TagClause
         { term: { tags: clause.tag } }
       else
-        raise "Unexpected clause type: #{clause}"
+        raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
       end
     end
   end
@@ -71,7 +71,7 @@ class AccountSearchQueryTransformer < Parslet::Transform
         when nil
           :should
         else
-          raise "Unknown operator: #{str}"
+          raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
         end
       end
     end
@@ -109,13 +109,19 @@ class AccountSearchQueryTransformer < Parslet::Transform
       when '-'
         @operator = :must_not
       else
-        raise "Unknown operator: #{str}"
+        raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
       end
 
       case prefix
       when 'domain', 'is'
         @filter = prefix.to_s
         @term = term
+      when 'scope'
+        raise Mastodon::SyntaxError unless operator.nil?
+        raise Mastodon::SyntaxError unless term == 'following'
+        @query = :terms
+        @filter = :id
+        @term = :following_ids_placeholder
       else
         raise Mastodon::SyntaxError
       end
@@ -135,7 +141,7 @@ class AccountSearchQueryTransformer < Parslet::Transform
       when '-'
         @operator = :must_not
       else
-        raise "Unknown operator: #{str}"
+        raise Mastodon::SyntaxError.new("Unknown operator: #{str}")
       end
     end
   end
@@ -155,7 +161,7 @@ class AccountSearchQueryTransformer < Parslet::Transform
     elsif clause[:phrase]
       PhraseClause.new(prefix, operator, clause[:phrase].is_a?(Array) ? clause[:phrase].map { |p| p[:term].to_s }.join(' ') : clause[:phrase].to_s)
     else
-      raise "Unexpected clause type: #{clause}"
+      raise Mastodon::SyntaxError.new("Unexpected clause type: #{clause}")
     end
   end
 
