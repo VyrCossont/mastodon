@@ -8,6 +8,7 @@ class StatusesController < ApplicationController
 
   before_action :require_account_signature!, only: [:show, :activity], if: -> { request.format == :json && authorized_fetch_mode? }
   before_action :set_status
+  before_action :feditrace_log, if: :feditrace_log?
   before_action :set_instance_presenter
   before_action :set_link_headers
   before_action :redirect_to_original, only: :show
@@ -21,6 +22,7 @@ class StatusesController < ApplicationController
     policy.frame_ancestors(false)
   end
 
+  # NOTE: don't use public caches for Feditraced statuses.
   def show
     respond_to do |format|
       format.html do
@@ -28,15 +30,16 @@ class StatusesController < ApplicationController
       end
 
       format.json do
-        expires_in 3.minutes, public: @status.distributable? && public_fetch_mode?
-        render_with_cache json: @status, content_type: 'application/activity+json', serializer: ActivityPub::NoteSerializer, adapter: ActivityPub::Adapter
+        expires_in 3.minutes, public: @status.distributable? && public_fetch_mode? && !@status.feditraceable?
+        render_with_cache json: @status, content_type: 'application/activity+json', serializer: ActivityPub::NoteSerializer, adapter: ActivityPub::Adapter, feditrace: feditrace_requesting_domain
       end
     end
   end
 
+  # NOTE: don't use public caches for Feditraced statuses.
   def activity
-    expires_in 3.minutes, public: @status.distributable? && public_fetch_mode?
-    render_with_cache json: ActivityPub::ActivityPresenter.from_status(@status), content_type: 'application/activity+json', serializer: ActivityPub::ActivitySerializer, adapter: ActivityPub::Adapter
+    expires_in 3.minutes, public: @status.distributable? && public_fetch_mode? && !@status.feditraceable?
+    render_with_cache json: ActivityPub::ActivityPresenter.from_status(@status), content_type: 'application/activity+json', serializer: ActivityPub::ActivitySerializer, adapter: ActivityPub::Adapter, feditrace: feditrace_requesting_domain
   end
 
   def embed
@@ -46,6 +49,10 @@ class StatusesController < ApplicationController
     response.headers['X-Frame-Options'] = 'ALLOWALL'
 
     render layout: 'embedded'
+  end
+
+  def feditrace_status_id
+    @status.id
   end
 
   private

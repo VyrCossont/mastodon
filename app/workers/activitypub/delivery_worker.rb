@@ -32,6 +32,8 @@ class ActivityPub::DeliveryWorker
     @host           = Addressable::URI.parse(inbox_url).normalized_site
     @performed      = false
 
+    feditrace_fill_placeholder
+
     perform_request
   ensure
     if @inbox_url.present?
@@ -44,6 +46,40 @@ class ActivityPub::DeliveryWorker
   end
 
   private
+
+  # HACK: this is where we fill in the Feditrace placeholder.
+  # It will not exist for non-statuses, non-distributable statuses, or if Feditrace is off.
+  # SEE: Feditrace#decorate_url
+  # SEE: ActivityPub::DistributionWorker#payload
+  def feditrace_fill_placeholder
+    return unless Rails.configuration.x.feditrace_enabled
+
+    domain = Addressable::URI.parse(@host)&.normalized_host
+    raise Mastodon::Error, "Can't extract domain from inbox host #{@host}" if domain.nil?
+
+    doc = JSON.parse(@json)
+
+    url = doc['object'] && doc['object']['url']
+    # Tombstones for deleted statuses don't have an object URL.
+    return if url.nil?
+
+    begin
+      parsed_url = Addressable::URI.parse(url)
+    rescue Addressable::URI::InvalidURIError => e
+      raise Rails.logger.error, "Can't parse object URL #{url}: #{e}"
+    end
+    raise Mastodon::Error, "Can't parse status URL: #{url}" if parsed_url.nil?
+
+    # This is definitely not a status URL with a placeholder query param in it. Leave it alone.
+    return if parsed_url.query_values.nil?
+
+    status_id = parsed_url.query_values[Feditrace::PARAM]
+    # This is a status URL without a placeholder query param. Leave it alone.
+    return if status_id.nil?
+
+    doc['object']['url'] = Feditrace.decorate_url(url, status_id, domain)
+    @json = JSON.generate(doc)
+  end
 
   def build_request(http_client)
     Request.new(:post, @inbox_url, body: @json, http_client: http_client).tap do |request|

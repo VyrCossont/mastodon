@@ -78,7 +78,10 @@ class REST::StatusSerializer < ActiveModel::Serializer
   end
 
   def url
-    ActivityPub::TagManager.instance.url_for(object)
+    url = ActivityPub::TagManager.instance.url_for(object)
+    return url unless object.feditraceable? && @instance_options[:feditrace].present?
+
+    Feditrace.decorate_url(url, object.id, @instance_options[:feditrace])
   end
 
   def favourited

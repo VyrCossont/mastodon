@@ -241,6 +241,19 @@ class Status < ApplicationRecord
 
   alias sign? distributable?
 
+  def feditraceable?
+    return false unless Rails.configuration.x.feditrace_enabled
+
+    case Rails.configuration.x.feditrace_scope
+    when :distributable
+      distributable?
+    when :public
+      public_visibility?
+    else
+      public_visibility? && account.discoverable?
+    end
+  end
+
   def with_media?
     ordered_media_attachments.any?
   end

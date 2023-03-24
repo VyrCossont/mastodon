@@ -152,4 +152,33 @@ class ApplicationController < ActionController::Base
       format.json { render json: { error: Rack::Utils::HTTP_STATUS_CODES[code] }, status: code }
     end
   end
+
+  def feditrace_log?
+    Rails.configuration.x.feditrace_enabled && request.query_parameters[Feditrace::PARAM].present?
+  end
+
+  def feditrace_log
+    Feditrace.log(feditrace_status_id, feditrace_requesting_domain, request)
+  rescue NameError => e
+    # NameError will happen if we're not in a controller that has access to the signed request.
+    Rails.logger.warn "feditrace_log called from a controller with no feditrace_status_id: #{e}"
+  end
+
+  # Known legit domain from a signed request.
+  def feditrace_requesting_domain
+    begin
+      signed_request_actor&.domain
+    rescue SignatureVerificationError
+      # SignatureVerificationError means the signed request was bad, but something probably checked it before we got here anyway.
+    end
+  rescue NameError => e
+    # NameError will happen if we're not in a controller that has access to `signed_request_actor`,
+    # in which case `SignatureVerificationError` doesn't exist either, hence the nesting here.
+    Rails.logger.warn "feditrace_requesting_domain called from a controller with no signed_request_actor: #{e}"
+  end
+
+  # Override this for classes that have a `@status`.
+  def feditrace_status_id
+    nil
+  end
 end

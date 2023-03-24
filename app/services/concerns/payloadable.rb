@@ -22,7 +22,9 @@ module Payloadable
     end
   end
 
+  # HACK: Don't sign payloads that will be modified by Feditrace code.
+  # SEE: ActivityPub::DeliveryWorker#fill_empty_feditrace_param
   def signing_enabled?
-    ENV['AUTHORIZED_FETCH'] != 'true' && !Rails.configuration.x.whitelist_mode
+    ENV['AUTHORIZED_FETCH'] != 'true' && !Rails.configuration.x.whitelist_mode && !Rails.configuration.x.feditrace_enabled
   end
 end
