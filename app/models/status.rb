@@ -245,7 +245,7 @@ class Status < ApplicationRecord
     return false unless Rails.configuration.x.feditrace_enabled
 
     case Rails.configuration.x.feditrace_scope
-    when :distributable
+    when :public_or_unlisted
       distributable?
     when :public
       public_visibility?

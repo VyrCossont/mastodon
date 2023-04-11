@@ -29,7 +29,10 @@ class ActivityPub::NoteSerializer < ActivityPub::Serializer
   attribute :voters_count, if: :poll_and_voters_count?
 
   def id
-    ActivityPub::TagManager.instance.uri_for(object)
+    id = ActivityPub::TagManager.instance.url_for(object)
+    return id unless object.feditraceable? && @instance_options[:feditrace].present?
+
+    Feditrace.decorate_url(id, object.id, @instance_options[:feditrace])
   end
 
   def type

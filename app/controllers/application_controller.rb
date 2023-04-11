@@ -158,7 +158,7 @@ class ApplicationController < ActionController::Base
   end
 
   def feditrace_log
-    Feditrace.log(feditrace_status_id, feditrace_requesting_domain, request)
+    Feditrace.log(feditrace_status_id, feditrace_requesting_domain, request, :request)
   rescue NameError => e
     # NameError will happen if we're not in a controller that has access to the signed request.
     Rails.logger.warn "feditrace_log called from a controller with no feditrace_status_id: #{e}"

@@ -1,8 +1,8 @@
 Rails.application.configure do
   config.x.feditrace_enabled = ENV['FEDITRACE_ENABLED'] == 'true'
-  config.x.feditrace_scope = case ENV.fetch('FEDITRACE_SCOPE')
-                             when 'distributable'
-                               :distributable
+  config.x.feditrace_scope = case ENV.fetch('FEDITRACE_SCOPE', nil)
+                             when 'public_or_unlisted'
+                               :public_or_unlisted
                              when 'public'
                                :public
                              else

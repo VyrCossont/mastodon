@@ -45,38 +45,56 @@ class Feditrace
 
   # @param [Integer|String] status_id ID of Feditraced status.
   # @param [String|Nil] requesting_domain Known domain from signed request.
-  # @param [ActionDispatch::Request] request Rails request.
-  def self.log(status_id, requesting_domain, request)
+  # @param [ActionDispatch::Request|Nil] request Rails request.
+  # @param [Symbol] log_type Log type: either :request for incoming requests or :delivery for outbound delivery.
+  def self.log(status_id, requesting_domain, request, log_type)
     # This is normal if the request wasn't signed.
     # A very common case would be the HTML view of a status.
     return if requesting_domain.blank?
 
     raise Mastodon::InvalidParameterError, 'Feditrace.log called without a status ID' if status_id.blank?
-    raise Mastodon::InvalidParameterError, 'Feditrace.log called without a request' if request.blank?
 
-    param_value = request.query_parameters[Feditrace::PARAM]
-    raise Mastodon::InvalidParameterError, 'Feditrace.log called without a Feditrace query param value' if param_value.blank?
+    case log_type
+    when :delivery
+      url = nil
+      ip = nil
+      referrer = Rails.configuration.x.local_domain
 
-    begin
-      payload, _header = JWT.decode param_value, secret, true, {
-        algorithm: ALGORITHM,
-        verify_iss: true,
-        verify_sub: true,
-        iss: Rails.configuration.x.local_domain,
-        sub: status_id.to_s,
-      }
-    rescue JWT::DecodeError => e
-      # This will probably happen a lot. Don't make a fuss.
-      Rails.logger.warn "Invalid Feditrace query parameter #{param_value}: #{e}"
-      return
+    when :request
+      raise Mastodon::InvalidParameterError, 'Feditrace.log called without a request' if request.blank?
+
+      param_value = request.query_parameters[Feditrace::PARAM]
+      raise Mastodon::InvalidParameterError, 'Feditrace.log called without a Feditrace query param value' if param_value.blank?
+
+      begin
+        payload, _header = JWT.decode param_value, secret, true, {
+          algorithm: ALGORITHM,
+          verify_iss: true,
+          verify_sub: true,
+          iss: Rails.configuration.x.local_domain,
+          sub: status_id.to_s,
+        }
+      rescue JWT::DecodeError => e
+        # This will probably happen a lot. Don't make a fuss.
+        Rails.logger.warn "Invalid Feditrace query parameter #{param_value}: #{e}"
+        return
+      end
+
+      url = request.original_url
+      ip = request.remote_ip
+      referrer = payload['referrer']
+
+    else
+      raise Mastodon::InvalidParameterError, "Feditrace.log called with an unknown log_type: #{log_type}"
     end
 
     log_entry = {
       time: Time.now.utc.iso8601,
-      url: request.original_url,
-      ip: request.remote_ip,
+      type: log_type.to_s,
+      url: url,
+      ip: ip,
       status_id: status_id.to_s,
-      referrer: payload['referrer'],
+      referrer: referrer,
       requesting_domain: requesting_domain,
     }
 

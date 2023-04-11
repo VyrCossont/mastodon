@@ -59,16 +59,26 @@ class ActivityPub::DeliveryWorker
 
     doc = JSON.parse(@json)
 
-    url = doc['object'] && doc['object']['url']
+    status_id = feditrace_rewrite_field(doc, 'id', domain)
+    return if status_id.nil?
+
+    feditrace_rewrite_field(doc, 'url', domain)
+
+    Feditrace.log(status_id, domain, nil, :delivery)
+    @json = JSON.generate(doc)
+  end
+
+  def feditrace_rewrite_field(doc, field, domain)
+    url = doc['object'] && doc['object'][field]
     # Tombstones for deleted statuses don't have an object URL.
     return if url.nil?
 
     begin
       parsed_url = Addressable::URI.parse(url)
     rescue Addressable::URI::InvalidURIError => e
-      raise Rails.logger.error, "Can't parse object URL #{url}: #{e}"
+      raise Rails.logger.error, "Can't parse object #{field} #{url}: #{e}"
     end
-    raise Mastodon::Error, "Can't parse status URL: #{url}" if parsed_url.nil?
+    raise Mastodon::Error, "Can't parse object #{field} #{url}" if parsed_url.nil?
 
     # This is definitely not a status URL with a placeholder query param in it. Leave it alone.
     return if parsed_url.query_values.nil?
@@ -77,8 +87,9 @@ class ActivityPub::DeliveryWorker
     # This is a status URL without a placeholder query param. Leave it alone.
     return if status_id.nil?
 
-    doc['object']['url'] = Feditrace.decorate_url(url, status_id, domain)
-    @json = JSON.generate(doc)
+    doc['object'][field] = Feditrace.decorate_url(url, status_id, domain)
+
+    status_id
   end
 
   def build_request(http_client)

@@ -70,7 +70,10 @@ class REST::StatusSerializer < ActiveModel::Serializer
   end
 
   def uri
-    ActivityPub::TagManager.instance.uri_for(object)
+    uri = ActivityPub::TagManager.instance.uri_for(object)
+    return uri unless object.feditraceable? && @instance_options[:feditrace].present?
+
+    Feditrace.decorate_url(uri, object.id, @instance_options[:feditrace])
   end
 
   def content
