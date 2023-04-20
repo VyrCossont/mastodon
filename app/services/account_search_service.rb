@@ -48,11 +48,11 @@ class AccountSearchService < BaseService
   def search_results
     return [] if limit_for_non_exact_results.zero?
 
-    @search_results ||= begin
-      results = from_elasticsearch if Chewy.enabled?
-      results ||= from_database
-      results
-    end
+    @search_results = if Chewy.enabled?
+                        from_elasticsearch
+                      else
+                        from_database
+                      end
   end
 
   def from_database
