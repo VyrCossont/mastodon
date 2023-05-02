@@ -154,12 +154,10 @@ class SearchQueryTransformer < Parslet::Transform
     class << self
       def symbol(str)
         case str
-        when '+'
+        when '+', nil
           :must
         when '-'
           :must_not
-        when nil
-          :should
         else
           raise Mastodon::SyntaxError, "Unknown operator: #{str}"
         end
