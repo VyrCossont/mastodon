@@ -552,10 +552,10 @@ class Status < ApplicationRecord
   end
 
   def trigger_create_webhooks
-    TriggerWebhookWorker.perform_async('status.created', 'Status', id) if local?
+    TriggerWebhookWorker.perform_async('status.created', 'Status', id)
   end
 
   def trigger_update_webhooks
-    TriggerWebhookWorker.perform_async('status.updated', 'Status', id) if local?
+    TriggerWebhookWorker.perform_async('status.updated', 'Status', id)
   end
 end
