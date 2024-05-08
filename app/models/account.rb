@@ -540,6 +540,6 @@ class Account < ApplicationRecord
 
   # NOTE: the `account.created` webhook is triggered by the `User` model, not `Account`.
   def trigger_update_webhooks
-    TriggerWebhookWorker.perform_async('account.updated', 'Account', id) if local?
+    TriggerWebhookWorker.perform_async('account.updated', 'Account', id)
   end
 end
